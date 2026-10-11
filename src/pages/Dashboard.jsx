@@ -29,6 +29,8 @@ export default function Dashboard() {
     const [bulkSellModal, setBulkSellModal] = useState({ open: false })
     const [invoice, setInvoice] = useState(null)
     const [blockedPharm, setBlockedPharm] = useState(null)
+    // ✅ جديد: مودال التعديل
+    const [editModal, setEditModal] = useState({ open: false, id: null, name: '', qty: '', buy: '', sell: '', category: 'أدوية' })
     const audioRef = useRef(null)
 
     useEffect(() => {
@@ -50,8 +52,6 @@ export default function Dashboard() {
 
     async function loadAll() {
         const { data: p, error } = await supabase.from('pharmacies').select('*').eq('id', pharmacyId).single()
-
-        // ✅ فحص الإيقاف - صاحب الصيدلية نفسه
         if (error) {
             console.log("PHARM ERROR", error)
             setBlockedPharm('حدث خطأ في تحميل بيانات الصيدلية')
@@ -86,6 +86,21 @@ export default function Dashboard() {
         setAddModal({ open: false, step: 1, category: 'أدوية', rows: [{ name: '', qty: '', buy: '', sell: '' }] }); setToast({ type: 'success', msg: `تمت إضافة ${valid.length} في ${addModal.category} ✅` }); loadAll()
     }
     async function delMed(id) { if (confirm('حذف الدواء؟')) { await supabase.from('medicines').delete().eq('id', id); loadAll() } }
+
+    // ✅ جديد: فتح التعديل
+    function openEdit(m) {
+        setEditModal({ open: true, id: m.id, name: m.name, qty: m.quantity, buy: m.buy_price, sell: m.sell_price, category: m.category || 'أدوية' })
+    }
+    // ✅ جديد: حفظ التعديل
+    async function saveEdit() {
+        if (!editModal.name.trim()) return setToast({ type: 'error', msg: 'اكتب اسم الدواء' })
+        const { error } = await supabase.from('medicines').update({ name: editModal.name, quantity: +editModal.qty || 0, buy_price: +editModal.buy || 0, sell_price: +editModal.sell || 0, category: editModal.category }).eq('id', editModal.id)
+        if (error) return setToast({ type: 'error', msg: error.message })
+        setEditModal({ open: false, id: null, name: '', qty: '', buy: '', sell: '', category: 'أدوية' })
+        setToast({ type: 'success', msg: 'تم التعديل بنجاح ✅' })
+        loadAll()
+    }
+
     function toggleSelectMed(m) { setSelectedForSale(p => { const c = { ...p }; if (c[m.id]) delete c[m.id]; else c[m.id] = 1; return c }) }
     function updateSaleQty(id, q) { setSelectedForSale(p => ({ ...p, [id]: Math.max(1, +q || 1) })) }
     async function confirmBulkSell() {
@@ -126,15 +141,15 @@ export default function Dashboard() {
           <title>طباعة QR - ${ph.name}</title>
           <style>
             body{ font-family:sans-serif; text-align:center; padding:30px; direction:rtl; background:white; }
-          .card{ border:4px solid #16a34a; border-radius:28px; padding:35px; max-width:520px; margin:0 auto; }
-          .icon{ width:60px; height:60px; background:linear-gradient(to bottom right,#16a34a,#10b981); color:white; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:28px; margin:0 auto 15px; }
+         .card{ border:4px solid #16a34a; border-radius:28px; padding:35px; max-width:520px; margin:0 auto; }
+         .icon{ width:60px; height:60px; background:linear-gradient(to bottom right,#16a34a,#10b981); color:white; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:28px; margin:0 auto 15px; }
             h1{ color:#14532d; font-size:34px; margin:0; font-weight:900; }
             h2{ color:#333; font-size:20px; margin:12px 0 25px; font-weight:700; }
-          .qr-box{ background:white; padding:12px; border-radius:20px; border:2px dashed #16a34a; display:inline-block; }
-          .qr-box img{ width:360px; height:360px; display:block; }
-          .link{ margin-top:18px; font-family:monospace; font-size:13px; color:#555; word-break:break-all; background:#f8fafc; padding:10px; border-radius:10px; border:1px solid #eee; }
-          .footer{ margin-top:22px; background:linear-gradient(to right,#16a34a,#15803d); color:white; padding:16px; border-radius:14px; font-weight:900; line-height:1.6; }
-          .print-btn{ margin-top:25px; background:#111827; color:white; padding:14px 35px; border:none; border-radius:999px; font-size:16px; font-weight:900; cursor:pointer; }
+         .qr-box{ background:white; padding:12px; border-radius:20px; border:2px dashed #16a34a; display:inline-block; }
+         .qr-box img{ width:360px; height:360px; display:block; }
+         .link{ margin-top:18px; font-family:monospace; font-size:13px; color:#555; word-break:break-all; background:#f8fafc; padding:10px; border-radius:10px; border:1px solid #eee; }
+         .footer{ margin-top:22px; background:linear-gradient(to right,#16a34a,#15803d); color:white; padding:16px; border-radius:14px; font-weight:900; line-height:1.6; }
+         .print-btn{ margin-top:25px; background:#111827; color:white; padding:14px 35px; border:none; border-radius:999px; font-size:16px; font-weight:900; cursor:pointer; }
             @media print{.print-btn{display:none;} body{padding:0;} }
           </style>
         </head>
@@ -225,11 +240,34 @@ export default function Dashboard() {
                 <div className="bg-white rounded-[22px] shadow-sm overflow-hidden border border-gray-100">
                     <div className="p-5 bg-gradient-to-r from-orange-50 to-amber-50 border-b flex justify-between items-center"><div className="font-black text-sm flex items-center gap-2"><span className="w-8 h-8 bg-orange-500 text-white rounded-full flex items-center justify-center text-xs">📦</span> الطلبات الواردة ({orders.length})</div><button onClick={() => { setNewOrderCount(0); loadOrders() }} className="bg-white border shadow-sm px-4 py-2 rounded-full text-xs font-bold hover:bg-black hover:text-white transition">🔄 تحديث</button></div>
                     {orders.length === 0 && <div className="p-16 text-center"><div className="w-16 h-16 bg-gray-50 rounded-full flex items-center justify-center mx-auto text-2xl">📭</div><div className="text-gray-400 text-sm mt-3">لا يوجد طلبات حالياً</div></div>}
-                    <div className="divide-y max-h-[700px] overflow-auto">
+                    <div className="divide-y max-h-[900px] overflow-auto">
                         {orders.map(o => (
                             <div key={o.id} className="p-5 bg-[#fffef8] hover:bg-yellow-50/50 transition">
                                 <div className="flex justify-between gap-3"><div><div className="font-black text-sm flex items-center gap-2">{o.customer_name} <span className="bg-[#111827] text-white text-[10px] px-2 py-0.5 rounded-full">{o.customer_phone}</span></div><div className="text-[11px] text-gray-600 mt-2 bg-white border inline-flex items-center gap-2 px-3 py-1.5 rounded-full">🏠 {o.address || 'بدون عنوان'} • 💳 {o.payment_method} • ⏰ {new Date(o.created_at).toLocaleString('ar-EG')}</div></div><div className="text-right"><div className="font-black text-green-600 text-lg">{o.total || 0} ر.ي</div><div className="text-[10px] text-gray-400">{orderItems[o.id]?.length || 0} أدوية</div></div></div>
-                                <div className="mt-4 grid md:grid-cols-2 gap-3"><div className="bg-white border rounded-2xl p-3">{orderItems[o.id]?.map((it, i) => <div key={i} className="flex justify-between text-[13px] py-2 border-b last:border-0"><span className="font-medium">{it.medicine_name} <span className="text-gray-400">x{it.qty}</span></span><span className="font-bold">{it.price * it.qty} ر.ي</span></div>)}</div>{(o.prescription_url || o.receipt_url) && <div className="flex gap-3">{o.prescription_url && <a href={o.prescription_url} target="_blank" className="group"><img src={o.prescription_url} className="w-24 h-24 rounded-2xl border object-cover group-hover:scale-105 transition" /><div className="text-[10px] text-center mt-1 text-gray-500">الوصفة</div></a>}{o.receipt_url && <a href={o.receipt_url} target="_blank" className="group"><img src={o.receipt_url} className="w-24 h-24 rounded-2xl border object-cover group-hover:scale-105 transition" /><div className="text-[10px] text-center mt-1 text-gray-500">سند التحويل</div></a>}</div>}</div>
+                                <div className="mt-4 grid md:grid-cols-2 gap-3">
+                                    <div className="bg-white border rounded-2xl p-3">
+                                        {orderItems[o.id]?.length > 0 ? orderItems[o.id]?.map((it, i) => <div key={i} className="flex justify-between text-[13px] py-2 border-b last:border-0"><span className="font-medium">{it.medicine_name} <span className="text-gray-400">x{it.qty}</span></span><span className="font-bold">{it.price * it.qty} ر.ي</span></div>) : <div className="text-xs text-orange-600 bg-orange-50 p-2 rounded-xl font-bold">📸 طلب وصفة طبية فقط - بدون سلة</div>}
+                                    </div>
+                                    {(o.prescription_url || o.receipt_url) && (
+                                        <div className="bg-white border rounded-2xl p-3">
+                                            <div className="font-black text-xs mb-2">📎 المرفقات:</div>
+                                            <div className="flex gap-3">
+                                                {o.prescription_url && (
+                                                    <a href={o.prescription_url} target="_blank" className="group flex-1">
+                                                        <img src={o.prescription_url} className="w-full h-36 rounded-2xl border-2 border-orange-200 object-cover group-hover:scale-[1.02] transition" />
+                                                        <div className="text-[11px] text-center mt-2 bg-orange-500 text-white rounded-full py-1.5 font-black group-hover:bg-orange-600">📸 فتح الوصفة</div>
+                                                    </a>
+                                                )}
+                                                {o.receipt_url && (
+                                                    <a href={o.receipt_url} target="_blank" className="group flex-1">
+                                                        <img src={o.receipt_url} className="w-full h-36 rounded-2xl border-2 border-blue-200 object-cover group-hover:scale-[1.02] transition" />
+                                                        <div className="text-[11px] text-center mt-2 bg-blue-600 text-white rounded-full py-1.5 font-black">🧾 فتح السند</div>
+                                                    </a>
+                                                )}
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
                                 <div className="flex gap-2 mt-4"><button onClick={() => setConfirmModal({ open: true, order: o })} className="bg-[#111827] hover:bg-black text-white px-6 py-2.5 rounded-full text-xs font-black shadow transition">✅ تم التوصيل وحساب الربح</button><a href={`https://wa.me/967${o.customer_phone?.replace(/^0/, '')}`} target="_blank" className="bg-[#25D366] hover:bg-[#1ea952] text-white px-5 py-2.5 rounded-full text-xs font-bold shadow transition">واتساب</a></div>
                             </div>
                         ))}
@@ -263,11 +301,59 @@ export default function Dashboard() {
                         {CATEGORIES.map(c => { const co = meds.filter(m => (m.category || 'أدوية') === c).length; return <button key={c} onClick={() => setCategoryFilter(c)} className={`px-4 py-2 rounded-full text-xs font-black border ${categoryFilter === c ? 'bg-blue-600 text-white' : 'bg-[#f8fafc]'}`}>{c} ({co})</button> })}
                     </div>
                     <div className="divide-y">
-                        <div className="grid grid-cols-12 gap-2 p-3.5 bg-[#f8fafc] text-[11px] font-black text-gray-500"><div className="col-span-1 text-center">✓</div><div className="col-span-5">الاسم</div><div className="col-span-1 text-center">الكمية</div><div className="col-span-2 text-center hidden md:block">شراء</div><div className="col-span-2 text-center">بيع</div><div className="col-span-2 text-center">إجراء</div></div>
-                        {filteredMeds.map(m => { const sel = !!selectedForSale[m.id]; return <div key={m.id} className={`grid grid-cols-12 gap-2 p-4 text-[13px] items-center ${sel ? 'bg-green-50 border-r-4 border-r-green-500' : ''}`}><div className="col-span-1 text-center"><input type="checkbox" checked={sel} onChange={() => toggleSelectMed(m)} className="w-5 h-5" /></div><div className="col-span-5"><div className="font-bold">{m.name}</div><span className="text-[10px] bg-blue-50 text-blue-700 px-2 py-0.5 rounded-full">{m.category || 'أدوية'}</span></div><div className="col-span-1 text-center font-bold">{m.quantity}</div><div className="col-span-2 text-center hidden md:block">{m.buy_price} ر.ي</div><div className="col-span-2 text-center font-black text-green-600">{m.sell_price} ر.ي</div><div className="col-span-2 text-center"><button onClick={() => delMed(m.id)} className="bg-red-50 text-red-600 px-3.5 py-1.5 rounded-full text-[11px]">حذف</button></div></div> })}
+                        <div className="grid grid-cols-12 gap-2 p-3.5 bg-[#f8fafc] text-[11px] font-black text-gray-500"><div className="col-span-1 text-center">✓</div><div className="col-span-4">الاسم</div><div className="col-span-1 text-center">الكمية</div><div className="col-span-2 text-center hidden md:block">شراء</div><div className="col-span-2 text-center">بيع</div><div className="col-span-2 text-center">إجراء</div></div>
+                        {filteredMeds.map(m => {
+                            const sel = !!selectedForSale[m.id];
+                            return (
+                                <div key={m.id} className={`grid grid-cols-12 gap-2 p-4 text-[13px] items-center ${sel ? 'bg-green-50 border-r-4 border-r-green-500' : ''}`}>
+                                    <div className="col-span-1 text-center"><input type="checkbox" checked={sel} onChange={() => toggleSelectMed(m)} className="w-5 h-5" /></div>
+                                    <div className="col-span-4"><div className="font-bold">{m.name}</div><span className="text-[10px] bg-blue-50 text-blue-700 px-2 py-0.5 rounded-full">{m.category || 'أدوية'}</span></div>
+                                    <div className="col-span-1 text-center font-bold">{m.quantity}</div>
+                                    <div className="col-span-2 text-center hidden md:block">{m.buy_price} ر.ي</div>
+                                    <div className="col-span-2 text-center font-black text-green-600">{m.sell_price} ر.ي</div>
+                                    <div className="col-span-2 text-center flex gap-1 justify-center">
+                                        <button onClick={() => openEdit(m)} className="bg-blue-50 text-blue-600 hover:bg-blue-600 hover:text-white px-3.5 py-1.5 rounded-full text-[11px] font-bold border border-blue-100 transition">✏️ تعديل</button>
+                                        <button onClick={() => delMed(m.id)} className="bg-red-50 text-red-600 px-3.5 py-1.5 rounded-full text-[11px]">حذف</button>
+                                    </div>
+                                </div>
+                            )
+                        })}
                     </div>
                 </div>
             </div>
+
+            {/* ✅ مودال التعديل الجديد */}
+            {editModal.open && (
+                <div className="fixed inset-0 bg-black/60 z-[60] flex items-center justify-center p-3" onClick={() => setEditModal({ open: false, id: null, name: '', qty: '', buy: '', sell: '', category: 'أدوية' })}>
+                    <div className="bg-white rounded-[28px] w-full max-w-lg overflow-hidden shadow-2xl border" onClick={e => e.stopPropagation()}>
+                        <div className="p-5 border-b flex justify-between items-center bg-[#f8fafc]">
+                            <div className="font-black">✏️ تعديل الدواء</div>
+                            <button onClick={() => setEditModal({ open: false, id: null, name: '', qty: '', buy: '', sell: '', category: 'أدوية' })} className="w-8 h-8 bg-white border rounded-full">✕</button>
+                        </div>
+                        <div className="p-5 space-y-3">
+                            <div>
+                                <div className="text-[11px] font-bold text-gray-500 mb-1">اسم الدواء</div>
+                                <input value={editModal.name} onChange={e => setEditModal({ ...editModal, name: e.target.value })} className="w-full border p-3.5 rounded-xl text-sm" placeholder="اسم الدواء" />
+                            </div>
+                            <div>
+                                <div className="text-[11px] font-bold text-gray-500 mb-1">القسم</div>
+                                <select value={editModal.category} onChange={e => setEditModal({ ...editModal, category: e.target.value })} className="w-full border p-3.5 rounded-xl text-sm bg-white">
+                                    {CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
+                                </select>
+                            </div>
+                            <div className="grid grid-cols-3 gap-2">
+                                <div><div className="text-[11px] font-bold text-gray-500 mb-1">الكمية</div><input type="number" value={editModal.qty} onChange={e => setEditModal({ ...editModal, qty: e.target.value })} className="w-full border p-3.5 rounded-xl text-sm" /></div>
+                                <div><div className="text-[11px] font-bold text-gray-500 mb-1">سعر الشراء</div><input type="number" value={editModal.buy} onChange={e => setEditModal({ ...editModal, buy: e.target.value })} className="w-full border p-3.5 rounded-xl text-sm" /></div>
+                                <div><div className="text-[11px] font-bold text-gray-500 mb-1">سعر البيع</div><input type="number" value={editModal.sell} onChange={e => setEditModal({ ...editModal, sell: e.target.value })} className="w-full border p-3.5 rounded-xl text-sm" /></div>
+                            </div>
+                        </div>
+                        <div className="p-4 border-t flex gap-2">
+                            <button onClick={() => setEditModal({ open: false, id: null, name: '', qty: '', buy: '', sell: '', category: 'أدوية' })} className="flex-1 bg-[#f8fafc] border p-3.5 rounded-full text-sm font-bold">إلغاء</button>
+                            <button onClick={saveEdit} className="flex-1 bg-blue-600 hover:bg-blue-700 text-white p-3.5 rounded-full text-sm font-black">💾 حفظ التعديل</button>
+                        </div>
+                    </div>
+                </div>
+            )}
 
             {addModal.open && (
                 <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-3" onClick={() => setAddModal({ open: false, step: 1, category: 'أدوية', rows: [{ name: '', qty: '', buy: '', sell: '' }] })}>
