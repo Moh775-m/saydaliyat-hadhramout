@@ -11,6 +11,68 @@
     <link rel="apple-touch-icon" href="/pwa-192x192.png" />
     <title>صيدليات حضرموت</title>
   </head>
+  <!-- زر التثبيت المضمون - خارج React -->
+<div id="pwa-install-container" style="display:none; position:fixed; bottom:20px; left:16px; right:16px; z-index:99999;">
+  <button id="pwa-install-btn" style="width:100%; background:#0d9488; color:white; padding:16px; border-radius:16px; font-weight:bold; border:2px solid white; box-shadow:0 10px 30px rgba(0,0,0,0.3); display:flex; align-items:center; justify-content:center; gap:8px;">
+    <span>📲</span> ثبّت تطبيق صيدليات حضرموت
+  </button>
+</div>
+
+<div id="pwa-instructions" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.7); z-index:100000; padding:16px; align-items:end; justify-content:center;">
+  <div style="background:white; width:100%; max-width:380px; border-radius:24px; padding:24px;">
+    <h3 style="font-weight:bold; text-align:center; margin-bottom:16px;">طريقة التثبيت</h3>
+    <div style="background:#f8fafc; padding:16px; border-radius:12px; font-size:14px; line-height:1.8; text-align:right;">
+      <p>1. اضغط على <b>الـ 3 نقاط ⋮</b> فوق</p>
+      <p>2. اختر <b>تثبيت التطبيق / Install app</b></p>
+      <p>3. اضغط <b>تثبيت</b></p>
+    </div>
+    <button onclick="document.getElementById('pwa-instructions').style.display='none'" style="width:100%; margin-top:16px; background:#0d9488; color:white; padding:12px; border-radius:12px; font-weight:bold;">فهمت</button>
+  </div>
+</div>
+
+<script>
+  let deferredPrompt = null;
+  const container = document.getElementById('pwa-install-container');
+  const btn = document.getElementById('pwa-install-btn');
+  const modal = document.getElementById('pwa-instructions');
+
+  // هل التطبيق مثبّت؟ إذا نعم لا تظهر شيء
+  const isStandalone = window.matchMedia('(display-mode: standalone)').matches;
+  if (!isStandalone) {
+    // أظهر الزر بعد ثانيتين بالقوة
+    setTimeout(() => {
+      container.style.display = 'flex';
+      console.log('✅ زر التثبيت ظهر بالقوة');
+    }, 2000);
+  }
+
+  window.addEventListener('beforeinstallprompt', (e) => {
+    e.preventDefault();
+    deferredPrompt = e;
+    container.style.display = 'flex';
+    console.log('✅ beforeinstallprompt جاهز');
+  });
+
+  btn.addEventListener('click', async () => {
+    if (deferredPrompt) {
+      deferredPrompt.prompt();
+      const { outcome } = await deferredPrompt.userChoice;
+      console.log('Install:', outcome);
+      if (outcome === 'dismissed') {
+        modal.style.display = 'flex';
+      } else {
+        container.style.display = 'none';
+      }
+      deferredPrompt = null;
+    } else {
+      modal.style.display = 'flex';
+    }
+  });
+
+  modal.addEventListener('click', (e) => {
+    if (e.target === modal) modal.style.display = 'none';
+  });
+</script>
   <body>
     <div id="root"></div>
     <script type="module" src="/src/main.jsx"></script>
