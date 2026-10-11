@@ -46,10 +46,7 @@ export default function Landing(){
             <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-green-600 to-emerald-500 flex items-center justify-center text-white text-lg shadow-lg shadow-green-600/20">💊</div>
             <div className="font-black text-[15px]">صيدليات حضرموت</div>
           </div>
-          <div className="flex items-center gap-2">
-            <div className="text-[11px] bg-white border shadow-sm px-3 py-1.5 rounded-full">📞 للاشتراك: 775443254</div>
-            <button onClick={()=>nav('/admin')} className="text-[11px] bg-[#111827] text-white px-5 py-2 rounded-full font-bold hover:bg-black transition">🔐 لوحة المدير</button>
-          </div>
+     
         </div>
 
         <div className="grid md:grid-cols-2 gap-8 items-center mt-10 md:mt-20">

@@ -9,11 +9,16 @@ export default function Admin(){
   const [list,setList]=useState([])
   const [f,setF]=useState({username:'',name:'',password:''})
   const [editing,setEditing]=useState(null)
+  // ✅ جديد: للتنبيهات والمودال الجميل
+  const [toast,setToast]=useState(null)
+  const [deleteModal,setDeleteModal]=useState({open:false,id:null})
+
+  useEffect(()=>{ if(toast){ const t=setTimeout(()=>setToast(null),3000); return ()=>clearTimeout(t) } },[toast])
 
   function check(){
     if(pass===import.meta.env.VITE_ADMIN_PASS) {
       setOk(true)
-    } else alert('كلمة المرور غلط')
+    } else setToast({type:'error',msg:'كلمة المرور غلط ❌'})
   }
 
   useEffect(()=>{
@@ -24,17 +29,17 @@ export default function Admin(){
     const {data, error} = await supabase.from('pharmacies').select('*').order('created_at',{ascending:false})
     console.log("ADMIN DATA:", data, "ERROR:", error)
     if(error){
-      alert("خطأ تحميل: " + error.message + "\nتأكد شغلت كود SQL اللي أرسلته")
+      setToast({type:'error',msg:"خطأ تحميل: "+error.message})
       return
     }
     setList(data||[])
   }
 
   async function create(){
-    if(!f.username||!f.name||!f.password) return alert('عبي الكل')
+    if(!f.username||!f.name||!f.password) return setToast({type:'error',msg:'عبي كل الحقول ❗'})
     if(editing){
       const {error} = await supabase.from('pharmacies').update({name:f.name, password:f.password}).eq('id',editing)
-      if(error) alert(error.message); else { setEditing(null); setF({username:'',name:'',password:''}); load(); alert('تم التعديل ✅') }
+      if(error) setToast({type:'error',msg:error.message}); else { setEditing(null); setF({username:'',name:'',password:''}); load(); setToast({type:'success',msg:'تم التعديل ✅'}) }
     } else {
       const {error}=await supabase.from('pharmacies').insert({
         username:f.username.toLowerCase().trim(),
@@ -44,19 +49,25 @@ export default function Admin(){
         subscription_status: 'active',
         end_date: new Date(Date.now()+30*24*60*60*1000).toISOString()
       })
-      if(error) alert(error.message); else { alert('تم انشاء '+f.name+" ✅"); setF({username:'',name:'',password:''}); load() }
+      if(error) setToast({type:'error',msg:error.message}); else { setToast({type:'success',msg:'تم انشاء '+f.name+" ✅"}); setF({username:'',name:'',password:''}); load() }
     }
   }
 
   async function del(id){
-    if(!confirm('متأكد تحذف الصيدلية نهائياً؟')) return
+    // ✅ تم استبدال confirm القبيح بمودال جميل
+    setDeleteModal({open:true,id})
+  }
+
+  async function confirmDelete(){
+    const id = deleteModal.id
     const {error} = await supabase.from('pharmacies').delete().eq('id',id)
-    if(error) alert(error.message); else load()
+    if(error) setToast({type:'error',msg:error.message}); else { setToast({type:'success',msg:'تم الحذف 🗑️'}); load() }
+    setDeleteModal({open:false,id:null})
   }
 
   async function toggleActive(p){
     const {error} = await supabase.from('pharmacies').update({is_active:!p.is_active}).eq('id',p.id)
-    if(error) alert(error.message); else load()
+    if(error) setToast({type:'error',msg:error.message}); else { setToast({type:'success',msg: p.is_active? 'تم الإيقاف ⏸️' : 'تم التفعيل ▶️'}); load() }
   }
 
   function startEdit(p){
@@ -67,6 +78,7 @@ export default function Admin(){
 
   if(!ok) return (
     <div dir="rtl" className="min-h-screen flex items-center justify-center bg-gray-100 p-4">
+      {toast && <div className={`fixed top-5 left-1/2 -translate-x-1/2 z-[100] px-6 py-3 rounded-full shadow-2xl text-sm font-black ${toast.type==='error'?'bg-red-600':'bg-[#111827]'} text-white`}>{toast.msg}</div>}
       <div className="bg-white p-8 rounded-[20px] w-80 shadow-xl border text-center">
         <div className="w-14 h-14 bg-black rounded-2xl flex items-center justify-center text-white text-xl mx-auto">🔐</div>
         <h2 className="font-black mt-4">دخول المدير</h2>
@@ -78,6 +90,8 @@ export default function Admin(){
 
   return (
     <div dir="rtl" className="min-h-screen bg-gray-100 p-4 md:p-6">
+      {toast && <div className={`fixed top-5 left-1/2 -translate-x-1/2 z-[100] px-6 py-3 rounded-full shadow-2xl text-sm font-black backdrop-blur ${toast.type==='error'?'bg-red-600':'bg-[#111827]'} text-white animate-bounce`}>{toast.msg}</div>}
+
       <div className="max-w-5xl mx-auto">
         <div className="flex justify-between items-center mb-6">
           <h1 className="font-black text-xl">👑 لوحة المدير ({list.length})</h1>
@@ -91,7 +105,7 @@ export default function Admin(){
           {/* نموذج الاضافة */}
           <div className="bg-white p-6 rounded-[20px] shadow-sm border sticky top-6">
             <h1 className="font-black text-sm">{editing? '✏️ تعديل صيدلية' : '➕ اضافة صيدلية جديدة'}</h1>
-            <input disabled={!!editing} value={f.username} onChange={e=>setF({...f,username:e.target.value})} placeholder="اليوزر انجليزي (مثلا alfalah)" className="w-full border-2 border-gray-100 focus:border-black p-3 rounded-xl mt-4 disabled:bg-gray-100 text-sm outline-none"/>
+            <input disabled={!!editing} value={f.username} onChange={e=>setF({...f,username:e.target.value})} placeholder="اليوزر انجليزي " className="w-full border-2 border-gray-100 focus:border-black p-3 rounded-xl mt-4 disabled:bg-gray-100 text-sm outline-none"/>
             <input value={f.name} onChange={e=>setF({...f,name:e.target.value})} placeholder="اسم الصيدلية" className="w-full border-2 border-gray-100 focus:border-black p-3 rounded-xl mt-2 text-sm outline-none"/>
             <input value={f.password} onChange={e=>setF({...f,password:e.target.value})} placeholder="كلمة السر" className="w-full border-2 border-gray-100 focus:border-black p-3 rounded-xl mt-2 text-sm outline-none"/>
             <button onClick={create} className="w-full bg-gradient-to-br from-green-600 to-emerald-500 text-white p-3 rounded-full mt-4 font-black text-sm shadow-lg">{editing? 'حفظ التعديل' : 'انشاء الصيدلية'}</button>
@@ -132,6 +146,24 @@ export default function Admin(){
           </div>
         </div>
       </div>
+
+      {/* ✅ مودال الحذف الجميل بدل confirm القبيح */}
+      {deleteModal.open && (
+        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-[28px] w-full max-w-sm overflow-hidden shadow-2xl border">
+            <div className="p-7 text-center">
+              <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto text-2xl">🗑️</div>
+              <div className="font-black text-lg mt-4">متأكد تحذف الصيدلية نهائياً؟</div>
+              <div className="text-xs text-gray-500 mt-2">لا يمكن التراجع بعد الحذف وسيتم حذف كل أدويتها</div>
+            </div>
+            <div className="p-4 flex gap-2 border-t bg-gray-50">
+              <button onClick={()=>setDeleteModal({open:false,id:null})} className="flex-1 bg-white border p-3 rounded-full text-sm font-bold">إلغاء</button>
+              <button onClick={confirmDelete} className="flex-1 bg-red-600 hover:bg-red-700 text-white p-3 rounded-full text-sm font-black">نعم، احذف نهائياً</button>
+            </div>
+          </div>
+        </div>
+      )}
+
     </div>
   )
 }
