@@ -7,9 +7,9 @@ export default function Admin(){
   const [pass,setPass]=useState('')
   const [ok,setOk]=useState(false)
   const [list,setList]=useState([])
-  const [f,setF]=useState({username:'',name:'',password:''})
+  // ✅ التعديل الوحيد هنا: أضفنا phone و address
+  const [f,setF]=useState({username:'',name:'',password:'',phone:'',address:''})
   const [editing,setEditing]=useState(null)
-  // ✅ جديد: للتنبيهات والمودال الجميل
   const [toast,setToast]=useState(null)
   const [deleteModal,setDeleteModal]=useState({open:false,id:null})
 
@@ -38,23 +38,30 @@ export default function Admin(){
   async function create(){
     if(!f.username||!f.name||!f.password) return setToast({type:'error',msg:'عبي كل الحقول ❗'})
     if(editing){
-      const {error} = await supabase.from('pharmacies').update({name:f.name, password:f.password}).eq('id',editing)
-      if(error) setToast({type:'error',msg:error.message}); else { setEditing(null); setF({username:'',name:'',password:''}); load(); setToast({type:'success',msg:'تم التعديل ✅'}) }
+      // ✅ تمت الإضافة: phone و address في التعديل
+      const {error} = await supabase.from('pharmacies').update({
+        name:f.name,
+        password:f.password,
+        phone:f.phone.trim(),
+        address:f.address.trim()
+      }).eq('id',editing)
+      if(error) setToast({type:'error',msg:error.message}); else { setEditing(null); setF({username:'',name:'',password:'',phone:'',address:''}); load(); setToast({type:'success',msg:'تم التعديل ✅'}) }
     } else {
       const {error}=await supabase.from('pharmacies').insert({
         username:f.username.toLowerCase().trim(),
         name:f.name.trim(),
         password:f.password,
+        phone:f.phone.trim(),
+        address:f.address.trim(),
         is_active: true,
         subscription_status: 'active',
         end_date: new Date(Date.now()+30*24*60*60*1000).toISOString()
       })
-      if(error) setToast({type:'error',msg:error.message}); else { setToast({type:'success',msg:'تم انشاء '+f.name+" ✅"}); setF({username:'',name:'',password:''}); load() }
+      if(error) setToast({type:'error',msg:error.message}); else { setToast({type:'success',msg:'تم انشاء '+f.name+" ✅"}); setF({username:'',name:'',password:'',phone:'',address:''}); load() }
     }
   }
 
   async function del(id){
-    // ✅ تم استبدال confirm القبيح بمودال جميل
     setDeleteModal({open:true,id})
   }
 
@@ -72,7 +79,8 @@ export default function Admin(){
 
   function startEdit(p){
     setEditing(p.id)
-    setF({username:p.username, name:p.name, password:p.password})
+    // ✅ تمت الإضافة: جلب phone و address عند التعديل
+    setF({username:p.username, name:p.name, password:p.password, phone:p.phone||'', address:p.address||''})
     window.scrollTo({top:0, behavior:'smooth'})
   }
 
@@ -107,9 +115,13 @@ export default function Admin(){
             <h1 className="font-black text-sm">{editing? '✏️ تعديل صيدلية' : '➕ اضافة صيدلية جديدة'}</h1>
             <input disabled={!!editing} value={f.username} onChange={e=>setF({...f,username:e.target.value})} placeholder="اليوزر انجليزي " className="w-full border-2 border-gray-100 focus:border-black p-3 rounded-xl mt-4 disabled:bg-gray-100 text-sm outline-none"/>
             <input value={f.name} onChange={e=>setF({...f,name:e.target.value})} placeholder="اسم الصيدلية" className="w-full border-2 border-gray-100 focus:border-black p-3 rounded-xl mt-2 text-sm outline-none"/>
+            {/* ✅ حقول جديدة فقط إضافة */}
+            <input value={f.phone} onChange={e=>setF({...f,phone:e.target.value})} placeholder="رقم الصيدلية - 777123456" className="w-full border-2 border-blue-50 focus:border-blue-400 bg-blue-50/40 p-3 rounded-xl mt-2 text-sm outline-none"/>
+            <input value={f.address} onChange={e=>setF({...f,address:e.target.value})} placeholder="عنوان الصيدلية - المكلا / فوة" className="w-full border-2 border-blue-50 focus:border-blue-400 bg-blue-50/40 p-3 rounded-xl mt-2 text-sm outline-none"/>
+
             <input value={f.password} onChange={e=>setF({...f,password:e.target.value})} placeholder="كلمة السر" className="w-full border-2 border-gray-100 focus:border-black p-3 rounded-xl mt-2 text-sm outline-none"/>
             <button onClick={create} className="w-full bg-gradient-to-br from-green-600 to-emerald-500 text-white p-3 rounded-full mt-4 font-black text-sm shadow-lg">{editing? 'حفظ التعديل' : 'انشاء الصيدلية'}</button>
-            {editing && <button onClick={()=>{setEditing(null); setF({username:'',name:'',password:''})}} className="w-full bg-gray-100 p-3 rounded-full mt-2 text-sm font-bold">الغاء</button>}
+            {editing && <button onClick={()=>{setEditing(null); setF({username:'',name:'',password:'',phone:'',address:''})}} className="w-full bg-gray-100 p-3 rounded-full mt-2 text-sm font-bold">الغاء</button>}
             <div className="text-[11px] text-gray-400 mt-4 text-center">رابط الصيدلية: /p/{f.username || 'username'}</div>
           </div>
 
@@ -132,6 +144,8 @@ export default function Admin(){
                         <span className={`text-[10px] px-2 py-0.5 rounded-full ${p.is_active? 'bg-green-50 text-green-700 border border-green-100':'bg-red-50 text-red-700 border border-red-100'}`}>{p.is_active? '✅ نشط' : '❌ موقوف'}</span>
                       </div>
                       <div className="text-xs text-gray-500 mt-1">@{p.username} • ينتهي: {p.end_date? new Date(p.end_date).toLocaleDateString('ar-YE') : 'غير محدد'}</div>
+                      {/* ✅ عرض الرقم والعنوان في لوحة المدير */}
+                      <div className="text-xs text-gray-600 mt-1">📞 {p.phone||'بدون رقم'} • 📍 {p.address||'بدون عنوان'}</div>
                       <div className="text-[11px] text-gray-400 mt-1">🔗 /p/{p.username}</div>
                     </div>
                     <div className="flex flex-col md:flex-row gap-1.5">
@@ -147,7 +161,6 @@ export default function Admin(){
         </div>
       </div>
 
-      {/* ✅ مودال الحذف الجميل بدل confirm القبيح */}
       {deleteModal.open && (
         <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
           <div className="bg-white rounded-[28px] w-full max-w-sm overflow-hidden shadow-2xl border">
@@ -163,7 +176,6 @@ export default function Admin(){
           </div>
         </div>
       )}
-
     </div>
   )
 }
